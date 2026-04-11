@@ -1,0 +1,946 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Clock, AlertCircle, CheckCircle2, Save, UserCheck, UserX, User, Calendar, RefreshCw, Search, Eye, FileText, Printer, Camera, X as XIcon, Edit2 } from "lucide-react"
+import { ProtectedRoute } from "../../../components/ProtectedRoute"
+import { useAuth } from "../../../hooks/useAuth"
+import { api, handleApiError } from "@/lib/api"
+import { toast } from "sonner"
+
+interface pacienteSalaEspera {
+  id: string
+  nombres: string
+  apellidos: string
+  documento: string
+  telefono?: string
+  email?: string
+  cita_id?: string
+  hora_cita?: string
+  fecha_cita?: string
+  estado_sala: "pendiente" | "llegada" | "confirmada" | "en_consulta" | "completada" | "no_asistio"
+  tiempo_espera?: number
+  tiene_cita_hoy?: boolean
+  sala_espera_id?: string
+}
+
+interface EstadisticasSalaEspera {
+  total: number
+  pendientes: number
+  llegadas: number
+  confirmadas: number
+  en_consulta: number
+  completadas: number
+  no_asistieron: number
+  con_cita_hoy: number
+  sin_cita_hoy: number
+  tiempo_promedio_espera?: number
+  tiempo_promedio_consulta?: number
+}
+
+export default function SalaEsperaPage() {
+  const router = useRouter()
+  const { user } = useAuth()
+  const [pacientes, setpacientes] = useState<pacienteSalaEspera[]>([])
+  const [estadisticas, setEstadisticas] = useState<EstadisticasSalaEspera>({
+    total: 0,
+    pendientes: 0,
+    llegadas: 0,
+    confirmadas: 0,
+    en_consulta: 0,
+    completadas: 0,
+    no_asistieron: 0,
+    con_cita_hoy: 0,
+    sin_cita_hoy: 0,
+    tiempo_promedio_espera: 15,
+    tiempo_promedio_consulta: 25
+  })
+  const [horaActual, setHoraActual] = useState(new Date())
+  const [loading, setLoading] = useState(true)
+  const [guardando, setGuardando] = useState(false)
+  const [cambiosPendientes, setCambiosPendientes] = useState<Record<string, {estado: string, cita_id?: string}>>({})
+  const [mostrarTodos, setMostrarTodos] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+
+  // Modal de ver plan quirúrgico
+  const [showPlanModal, setShowPlanModal] = useState(false)
+  const [planParaVer, setPlanParaVer] = useState<any>(null)
+  const [esquemaUrlModal, setEsquemaUrlModal] = useState('')
+  const [loadingPlan, setLoadingPlan] = useState(false)
+
+  const abrirPlanPaciente = async (paciente: pacienteSalaEspera) => {
+    setLoadingPlan(true)
+    try {
+      const res = await api.getPlanesQuirurgicos(100, 0)
+      const planes = Array.isArray(res) ? res : (res?.planes || res?.data || [])
+      const planExistente = planes.find((p: any) => {
+        const planPacId = String(p.paciente_id || p.id_paciente || p.datos_paciente?.id || '')
+        return planPacId === String(paciente.id)
+      })
+
+      if (planExistente) {
+        setPlanParaVer(planExistente)
+        setShowPlanModal(true)
+        setEsquemaUrlModal('')
+
+        // Buscar esquema en HC
+        const pacId = planExistente.id_paciente || planExistente.datos_paciente?.id
+        if (pacId) {
+          try {
+            const historias = await api.getHistoriasBypaciente(parseInt(pacId))
+            let historiasArray: any[] = []
+            if (Array.isArray(historias)) historiasArray = historias
+            else if (historias?.historias) historiasArray = historias.historias
+            else if (historias?.data) historiasArray = historias.data
+            if (historiasArray.length > 0) {
+              const hcReciente = historiasArray[historiasArray.length - 1]
+              const fotosStr = hcReciente.fotos ? String(hcReciente.fotos) : ''
+              const fotos = fotosStr.split(',').filter((f: string) => f.trim())
+              const esquemas = fotos.filter((f: string) => f.includes('esquema_'))
+              if (esquemas.length > 0) setEsquemaUrlModal(esquemas[esquemas.length - 1])
+            }
+          } catch { /* ignore */ }
+        }
+      } else {
+        // No tiene plan: crear nuevo
+        router.push(`/dashboard/plan-quirurgico?pacienteId=${paciente.id}&nombre=${encodeURIComponent(paciente.nombres + ' ' + paciente.apellidos)}&cedula=${encodeURIComponent(paciente.documento)}`)
+      }
+    } catch {
+      router.push(`/dashboard/plan-quirurgico?pacienteId=${paciente.id}&nombre=${encodeURIComponent(paciente.nombres + ' ' + paciente.apellidos)}&cedula=${encodeURIComponent(paciente.documento)}`)
+    } finally {
+      setLoadingPlan(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+    
+    // Actualizar hora cada segundo
+    const timer = setInterval(() => {
+      setHoraActual(new Date())
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      console.log("📥 Cargando datos de sala de espera desde backend...")
+      console.log(`📊 Mostrar todos: ${mostrarTodos}`)
+      
+      // Usar el endpoint del backend
+      const response = await api.getSalaEspera(mostrarTodos)
+      console.log("📊 Respuesta del backend:", response)
+      
+      if (response && response.success && response.pacientes) {
+        // Mapear la respuesta del backend al formato esperado
+        const pacientesSala: pacienteSalaEspera[] = response.pacientes.map((paciente: any) => ({
+          id: paciente.id.toString(),
+          nombres: paciente.nombres || paciente.nombre || "",
+          apellidos: paciente.apellidos || paciente.apellido || "",
+          documento: paciente.documento || paciente.numero_documento || "",
+          telefono: paciente.telefono || "",
+          email: paciente.email || "",
+          cita_id: paciente.cita_id?.toString(),
+          hora_cita: paciente.hora_cita,
+          fecha_cita: paciente.fecha_cita,
+          estado_sala: paciente.estado_sala || "pendiente",
+          tiempo_espera: paciente.tiempo_espera || 0,
+          tiene_cita_hoy: paciente.tiene_cita_hoy || false,
+          sala_espera_id: paciente.sala_espera_id?.toString()
+        }))
+        
+        console.log(`🏥 pacientes cargados: ${pacientesSala.length}`)
+        setpacientes(pacientesSala)
+        
+        // Cargar estadísticas desde el backend
+        await loadEstadisticas()
+        
+        toast.success(`✅ Cargados ${pacientesSala.length} pacientes`)
+      } else {
+        console.warn("⚠️ No se recibieron datos de pacientes o success=false")
+        console.log("Respuesta completa:", response)
+        await loadDataFallback()
+      }
+      
+    } catch (error: any) {
+      console.error("❌ Error cargando datos de sala de espera:", error)
+      toast.error("Error cargando datos: " + handleApiError(error))
+      
+      // Fallback: cargar datos como antes si el endpoint nuevo falla
+      await loadDataFallback()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadDataFallback = async () => {
+    try {
+      console.log("🔄 Usando método de carga fallback...")
+      
+      // Obtener citas de hoy
+      const hoy = new Date().toISOString().split("T")[0]
+      
+      let citasHoy: any[] = []
+      try {
+        const citasResponse = await api.getcitas(100, 0)
+        let citasArray: any[] = []
+        
+        if (Array.isArray(citasResponse)) {
+          citasArray = citasResponse
+        } else if (citasResponse?.citas && Array.isArray(citasResponse.citas)) {
+          citasArray = citasResponse.citas
+        } else if (citasResponse?.data && Array.isArray(citasResponse.data)) {
+          citasArray = citasResponse.data
+        }
+        
+        citasHoy = citasArray.filter((cita: any) => {
+          if (!cita.fecha_hora) return false
+          const fechaHoraStr = cita.fecha_hora.toString()
+          let fechacita = ""
+          
+          if (fechaHoraStr.includes(' ')) {
+            fechacita = fechaHoraStr.split(' ')[0]
+          } else if (fechaHoraStr.includes('T')) {
+            fechacita = fechaHoraStr.split('T')[0]
+          }
+          
+          return fechacita === hoy
+        })
+      } catch (error) {
+        console.error("Error obteniendo citas:", error)
+      }
+      
+      // Obtener pacientes
+      let pacientesArray: any[] = []
+      try {
+        const pacientesResponse = await api.getpacientes(1000, 0)
+        
+        if (Array.isArray(pacientesResponse)) {
+          pacientesArray = pacientesResponse
+        } else if (pacientesResponse?.pacientes && Array.isArray(pacientesResponse.pacientes)) {
+          pacientesArray = pacientesResponse.pacientes
+        } else if (pacientesResponse?.data && Array.isArray(pacientesResponse.data)) {
+          pacientesArray = pacientesResponse.data
+        }
+      } catch (error) {
+        console.error("Error obteniendo pacientes:", error)
+        toast.error("Error cargando pacientes: " + handleApiError(error))
+        return
+      }
+      
+      // Crear lista combinada
+      const pacientesSala: pacienteSalaEspera[] = pacientesArray.map((paciente: any) => {
+        const citaHoy = citasHoy.find((cita: any) => cita.paciente_id == paciente.id)
+        
+        let estadoSala: pacienteSalaEspera["estado_sala"] = "pendiente"
+        let horacita = ""
+        let fechacita = ""
+        let tienecitaHoy = false
+        
+        if (citaHoy) {
+          tienecitaHoy = true
+          
+          if (citaHoy.fecha_hora) {
+            const fechaHoraStr = citaHoy.fecha_hora.toString()
+            if (fechaHoraStr.includes(' ')) {
+              horacita = fechaHoraStr.split(' ')[1]?.substring(0, 5) || "09:00"
+              fechacita = fechaHoraStr.split(' ')[0]
+            } else if (fechaHoraStr.includes('T')) {
+              horacita = fechaHoraStr.split('T')[1]?.substring(0, 5) || "09:00"
+              fechacita = fechaHoraStr.split('T')[0]
+            }
+          }
+          
+          if (citaHoy.estado_id === 2) estadoSala = "confirmada"
+          else if (citaHoy.estado_id === 3) estadoSala = "completada"
+          else if (citaHoy.estado_id === 4) estadoSala = "pendiente"
+        }
+        
+        return {
+          id: paciente.id.toString(),
+          nombres: paciente.nombres || paciente.nombre || "",
+          apellidos: paciente.apellidos || paciente.apellido || "",
+          documento: paciente.documento || paciente.numero_documento || "",
+          telefono: paciente.telefono || "",
+          email: paciente.email || "",
+          cita_id: citaHoy?.id?.toString(),
+          hora_cita: horacita,
+          fecha_cita: fechacita,
+          estado_sala: estadoSala,
+          tiempo_espera: 0,
+          tiene_cita_hoy: tienecitaHoy
+        }
+      })
+      
+      setpacientes(pacientesSala)
+      calcularEstadisticas(pacientesSala)
+      
+    } catch (error: any) {
+      console.error("❌ Error en carga fallback:", error)
+      toast.error("Error cargando datos: " + handleApiError(error))
+    }
+  }
+
+  const loadEstadisticas = async () => {
+    try {
+      console.log("📈 Cargando estadísticas...")
+      const response = await api.getEstadisticasSalaEspera()
+      console.log("📈 Estadísticas del backend:", response)
+      
+      if (response && response.success && response.estadisticas) {
+        setEstadisticas({
+          total: response.estadisticas.total || 0,
+          pendientes: response.estadisticas.pendientes || 0,
+          llegadas: response.estadisticas.llegadas || 0,
+          confirmadas: response.estadisticas.confirmadas || 0,
+          en_consulta: response.estadisticas.en_consulta || 0,
+          completadas: response.estadisticas.completadas || 0,
+          no_asistieron: response.estadisticas.no_asistieron || 0,
+          con_cita_hoy: response.estadisticas.con_cita_hoy || 0,
+          sin_cita_hoy: response.estadisticas.sin_cita_hoy || 0,
+          tiempo_promedio_espera: response.estadisticas.tiempo_promedio_espera || 15,
+          tiempo_promedio_consulta: response.estadisticas.tiempo_promedio_consulta || 25
+        })
+      } else {
+        console.warn("⚠️ No se pudieron cargar estadísticas del backend")
+        // Si falla, calcular localmente
+        calcularEstadisticas(pacientes)
+      }
+    } catch (error) {
+      console.error("Error cargando estadísticas:", error)
+      // Si falla, calcular localmente
+      calcularEstadisticas(pacientes)
+    }
+  }
+
+  const calcularEstadisticas = (pacientesList: pacienteSalaEspera[]) => {
+    const stats: EstadisticasSalaEspera = {
+      total: pacientesList.length,
+      pendientes: pacientesList.filter(p => p.estado_sala === "pendiente").length,
+      llegadas: pacientesList.filter(p => p.estado_sala === "llegada").length,
+      confirmadas: pacientesList.filter(p => p.estado_sala === "confirmada").length,
+      en_consulta: pacientesList.filter(p => p.estado_sala === "en_consulta").length,
+      completadas: pacientesList.filter(p => p.estado_sala === "completada").length,
+      no_asistieron: pacientesList.filter(p => p.estado_sala === "no_asistio").length,
+      con_cita_hoy: pacientesList.filter(p => p.tiene_cita_hoy).length,
+      sin_cita_hoy: pacientesList.filter(p => !p.tiene_cita_hoy).length,
+      tiempo_promedio_espera: 15,
+      tiempo_promedio_consulta: 25
+    }
+    
+    setEstadisticas(stats)
+  }
+
+  const handleChangeEstado = (pacienteId: string, nuevoEstado: pacienteSalaEspera["estado_sala"]) => {
+    console.log(`🔄 Cambiando estado del paciente ${pacienteId} a: ${nuevoEstado}`)
+    
+    // Encontrar paciente para obtener cita_id
+    const paciente = pacientes.find(p => p.id === pacienteId)
+    if (!paciente) {
+      console.error(`❌ paciente ${pacienteId} no encontrado`)
+      return
+    }
+    
+    console.log(`📋 Datos del paciente:`, paciente)
+    
+    // Actualizar estado local
+    const pacientesActualizados = pacientes.map(p => 
+      p.id === pacienteId ? { ...p, estado_sala: nuevoEstado } : p
+    )
+    
+    setpacientes(pacientesActualizados)
+    
+    // Registrar cambio pendiente con cita_id
+    setCambiosPendientes(prev => ({
+      ...prev,
+      [pacienteId]: {
+        estado: nuevoEstado,
+        cita_id: paciente.cita_id
+      }
+    }))
+    
+    // Recalcular estadísticas
+    calcularEstadisticas(pacientesActualizados)
+    
+    toast.success(`Estado cambiado a: ${getEstadoLabel(nuevoEstado)}`)
+  }
+
+  const handleGuardarEstados = async () => {
+    if (Object.keys(cambiosPendientes).length === 0) {
+      toast.info("No hay cambios pendientes para guardar")
+      return
+    }
+
+    try {
+      setGuardando(true)
+      console.log("💾 Guardando cambios de estado en backend...")
+      console.log("📋 Cambios pendientes:", cambiosPendientes)
+
+      // Preparar datos para enviar al backend
+      const cambiosParaEnviar: Record<string, string> = {}
+      Object.entries(cambiosPendientes).forEach(([pacienteId, datos]) => {
+        cambiosParaEnviar[pacienteId] = datos.estado
+      })
+      
+      console.log("📤 Datos a enviar al backend:", cambiosParaEnviar)
+      
+      // Llamar al endpoint del backend para guardar múltiples cambios
+      const response = await api.bulkUpdateEstadosSalaEspera(cambiosParaEnviar)
+      
+      console.log("✅ Respuesta del backend:", response)
+      
+      if (response && response.success) {
+        // Limpiar cambios pendientes
+        setCambiosPendientes({})
+        
+        // Recargar datos para asegurar consistencia
+        await loadData()
+        
+        const mensaje = response.actualizados 
+          ? `✅ ${response.actualizados} cambios guardados exitosamente`
+          : `✅ Cambios guardados exitosamente`
+        
+        toast.success(mensaje)
+        
+        if (response.errores && response.errores.length > 0) {
+          console.warn("⚠️ Algunos errores:", response.errores)
+          toast.warning(`Hubo ${response.errores.length} errores al guardar algunos cambios`)
+        }
+      } else {
+        toast.error("Error guardando cambios en el servidor")
+      }
+      
+    } catch (error: any) {
+      console.error("❌ Error guardando estados:", error)
+      toast.error("Error guardando cambios: " + handleApiError(error))
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const getEstadoIcon = (estado: string) => {
+    switch (estado) {
+      case "llegada":
+        return <AlertCircle className="text-yellow-500" size={20} />
+      case "confirmada":
+        return <CheckCircle2 className="text-green-500" size={20} />
+      case "en_consulta":
+        return <UserCheck className="text-blue-500" size={20} />
+      case "completada":
+        return <CheckCircle2 className="text-purple-500" size={20} />
+      case "no_asistio":
+        return <UserX className="text-red-500" size={20} />
+      default:
+        return <Clock className="text-gray-400" size={20} />
+    }
+  }
+
+  const getEstadoColor = (estado: string) => {
+    switch (estado) {
+      case "pendiente":
+        return "bg-gray-100 text-gray-800 hover:bg-gray-200"
+      case "llegada":
+        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+      case "confirmada":
+        return "bg-green-100 text-green-800 hover:bg-green-200"
+      case "en_consulta":
+        return "bg-blue-100 text-blue-800 hover:bg-blue-200"
+      case "completada":
+        return "bg-purple-100 text-purple-800 hover:bg-purple-200"
+      case "no_asistio":
+        return "bg-red-100 text-red-800 hover:bg-red-200"
+      default:
+        return "bg-gray-100 text-gray-800 hover:bg-gray-200"
+    }
+  }
+
+  const getEstadoLabel = (estado: string): string => {
+    switch (estado) {
+      case "pendiente": return "Pendiente"
+      case "llegada": return "Llegada"
+      case "confirmada": return "Confirmada"
+      case "en_consulta": return "En Consulta"
+      case "completada": return "Completada"
+      case "no_asistio": return "No Asistió"
+      default: return estado
+    }
+  }
+
+  const estadosDisponibles: pacienteSalaEspera["estado_sala"][] = [
+    "pendiente", "llegada", "confirmada", "en_consulta", "completada", "no_asistio"
+  ]
+
+  // Filtrar pacientes según mostrarTodos y término de búsqueda
+  const pacientesFiltrados = pacientes
+    .filter(p => mostrarTodos ? true : p.tiene_cita_hoy)
+    .filter(p => {
+      if (!searchTerm.trim()) return true
+      const term = searchTerm.toLowerCase()
+      const nombre = `${p.nombres} ${p.apellidos}`.toLowerCase()
+      return nombre.includes(term) || p.documento?.toLowerCase().includes(term)
+    })
+
+  // Actualizar cuando cambia mostrarTodos
+  useEffect(() => {
+    if (!loading) {
+      loadData()
+    }
+  }, [mostrarTodos])
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1a6b32] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando sala de espera...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <ProtectedRoute permissions={["ver_sala_espera"]}>
+      <div className="p-8">
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800">Sala de Espera</h1>
+              <p className="text-gray-600 mt-2">Control en tiempo real de pacientes</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="text-right">
+                <p className="text-4xl font-bold text-[#1a6b32]">{horaActual.toLocaleTimeString("es-CO")}</p>
+                <p className="text-gray-600">{horaActual.toLocaleDateString("es-CO")}</p>
+              </div>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={loadData}
+                  className="flex items-center space-x-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-700"
+                  title="Recargar datos"
+                >
+                  <RefreshCw size={20} />
+                  <span className="hidden md:inline">Recargar</span>
+                </button>
+                <button
+                  onClick={handleGuardarEstados}
+                  disabled={guardando || Object.keys(cambiosPendientes).length === 0}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${
+                    guardando || Object.keys(cambiosPendientes).length === 0
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-[#1a6b32] hover:bg-[#155529] text-white"
+                  }`}
+                >
+                  <Save size={20} />
+                  <span>
+                    {guardando ? "Guardando..." : `Guardar Cambios (${Object.keys(cambiosPendientes).length})`}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filtros y estadísticas */}
+        <div className="mb-4 flex flex-wrap gap-2 items-center justify-between">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setMostrarTodos(true)}
+              className={`px-3 py-1 rounded-lg transition text-sm ${
+                mostrarTodos
+                  ? "bg-[#1a6b32] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Todos los pacientes ({estadisticas.total})
+            </button>
+            <button
+              onClick={() => setMostrarTodos(false)}
+              className={`px-3 py-1 rounded-lg transition text-sm ${
+                !mostrarTodos
+                  ? "bg-[#1a6b32] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Con cita Hoy ({estadisticas.con_cita_hoy})
+            </button>
+          </div>
+
+          <div className="text-sm text-gray-600">
+            <span className="font-medium">Mostrando:</span> {pacientesFiltrados.length} pacientes
+            {Object.keys(cambiosPendientes).length > 0 && (
+              <span className="ml-4 font-medium text-amber-600">
+                ⚠️ {Object.keys(cambiosPendientes).length} cambios pendientes
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Buscador */}
+        <div className="mb-6">
+          <div className="relative max-w-md">
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+              <Search className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por nombre o documento..."
+              className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1a6b32] focus:border-transparent outline-none transition"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                type="button"
+              >
+                <span className="text-lg">&times;</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Estadísticas rápidas */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-gray-50 rounded-lg shadow-sm border border-gray-200 p-4 text-center">
+            <p className="text-3xl font-bold text-gray-800">{estadisticas.total}</p>
+            <p className="text-sm text-gray-600 mt-1">Total pacientes</p>
+          </div>
+          <div className="bg-yellow-50 rounded-lg shadow-sm border border-yellow-200 p-4 text-center">
+            <p className="text-3xl font-bold text-yellow-800">{estadisticas.llegadas}</p>
+            <p className="text-sm text-yellow-600 mt-1">Llegada</p>
+          </div>
+          <div className="bg-blue-50 rounded-lg shadow-sm border border-blue-200 p-4 text-center">
+            <p className="text-3xl font-bold text-blue-800">{estadisticas.en_consulta}</p>
+            <p className="text-sm text-blue-600 mt-1">En Consulta</p>
+          </div>
+          <div className="bg-purple-50 rounded-lg shadow-sm border border-purple-200 p-4 text-center">
+            <p className="text-3xl font-bold text-purple-800">{estadisticas.completadas}</p>
+            <p className="text-sm text-purple-600 mt-1">Completada</p>
+          </div>
+        </div>
+
+        {/* Detalle de estadísticas */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center space-x-2 mb-3">
+              <Calendar size={20} className="text-gray-500" />
+              <h3 className="font-semibold text-gray-800">citas Hoy</h3>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-600">Con cita hoy:</span>
+              <span className="font-bold text-blue-600">{estadisticas.con_cita_hoy}</span>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-600">Sin cita hoy:</span>
+              <span className="font-bold text-gray-600">{estadisticas.sin_cita_hoy}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Confirmadas hoy:</span>
+              <span className="font-bold text-green-600">{estadisticas.confirmadas}</span>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center space-x-2 mb-3">
+              <User size={20} className="text-gray-500" />
+              <h3 className="font-semibold text-gray-800">Resumen de Estados</h3>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-600">Pendientes:</span>
+              <span className="font-bold text-gray-800">{estadisticas.pendientes}</span>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-600">No Asistieron:</span>
+              <span className="font-bold text-red-600">{estadisticas.no_asistieron}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Tasa completadas:</span>
+              <span className="font-bold text-purple-600">
+                {estadisticas.total > 0 
+                  ? Math.round((estadisticas.completadas / estadisticas.total) * 100) 
+                  : 0}%
+              </span>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center space-x-2 mb-3">
+              <CheckCircle2 size={20} className="text-green-500" />
+              <h3 className="font-semibold text-gray-800">Información General</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-2">
+              <span className="font-medium">Horas de atención:</span> 8:00 AM - 6:00 PM
+            </p>
+            <p className="text-sm text-gray-600 mb-2">
+              <span className="font-medium">Tiempo promedio espera:</span> {estadisticas.tiempo_promedio_espera?.toFixed(0) || 15} min
+            </p>
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">Tiempo promedio consulta:</span> {estadisticas.tiempo_promedio_consulta?.toFixed(0) || 25} min
+            </p>
+          </div>
+        </div>
+
+        {/* Lista de pacientes */}
+        <div className="space-y-3">
+          {pacientesFiltrados.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+              <Clock size={48} className="mx-auto text-gray-300 mb-4" />
+              <p className="text-gray-600">No hay pacientes para mostrar</p>
+              <p className="text-sm text-gray-500 mt-2">
+                {mostrarTodos 
+                  ? "No hay pacientes registrados en la base de datos" 
+                  : "No hay pacientes con cita programada para hoy"}
+              </p>
+              <button
+                onClick={loadData}
+                className="mt-4 px-4 py-2 bg-[#1a6b32] text-white rounded-lg hover:bg-[#155529] transition"
+              >
+                Recargar Datos
+              </button>
+            </div>
+          ) : (
+            pacientesFiltrados.map((paciente) => (
+              <div
+                key={paciente.id}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition"
+              >
+                <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
+                  <div className="flex items-start md:items-center space-x-4 flex-1">
+                    {getEstadoIcon(paciente.estado_sala)}
+                    <div className="flex-1">
+                      <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2">
+                        <p
+                          className={`font-semibold text-gray-800 text-lg ${user?.rol === 'doctor' ? 'cursor-pointer hover:text-[#1a6b32] hover:underline' : ''}`}
+                          onClick={() => {
+                            if (user?.rol === 'doctor') {
+                              abrirPlanPaciente(paciente)
+                            }
+                          }}
+                        >
+                          {paciente.nombres} {paciente.apellidos}
+                        </p>
+                        {paciente.tiene_cita_hoy && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 self-start md:self-auto">
+                            <Calendar size={12} className="mr-1" />
+                            cita Hoy
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Documento: {paciente.documento} | Teléfono: {paciente.telefono || "No disponible"}
+                      </p>
+                      {paciente.hora_cita && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          cita: {paciente.hora_cita} {paciente.fecha_cita && `(${paciente.fecha_cita})`} | ID cita: {paciente.cita_id || "N/A"}
+                        </p>
+                      )}
+                      {!paciente.tiene_cita_hoy && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          ⚠️ No tiene cita programada para hoy
+                        </p>
+                      )}
+                      
+                      {/* Indicador de cambio pendiente (mobile) */}
+                      {cambiosPendientes[paciente.id] && (
+                        <div className="mt-2 md:hidden">
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                            <Save size={12} className="mr-1" />
+                            Cambio pendiente: {getEstadoLabel(cambiosPendientes[paciente.id].estado)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row md:items-center space-y-3 md:space-y-0 md:space-x-6">
+                    <div className="text-right">
+                      {paciente.hora_cita && (
+                        <p className="text-sm font-semibold text-gray-700">{paciente.hora_cita}</p>
+                      )}
+                      <p className="text-xs text-gray-600">
+                        Espera: {paciente.tiempo_espera || 0} min
+                      </p>
+                    </div>
+
+                    <div className="flex items-center">
+                      <select
+                        value={paciente.estado_sala}
+                        onChange={(e) => handleChangeEstado(paciente.id, e.target.value as pacienteSalaEspera["estado_sala"])}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition cursor-pointer ${getEstadoColor(paciente.estado_sala)} w-full md:w-auto`}
+                      >
+                        {estadosDisponibles.map((estado) => (
+                          <option key={estado} value={estado}>
+                            {getEstadoLabel(estado)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Indicador de cambio pendiente (desktop) */}
+                {cambiosPendientes[paciente.id] && (
+                  <div className="mt-2 text-right hidden md:block">
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                      <Save size={12} className="mr-1" />
+                      Cambio pendiente: {getEstadoLabel(cambiosPendientes[paciente.id].estado)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Loading overlay al buscar plan */}
+      {loadingPlan && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-8 text-center shadow-xl">
+            <div className="w-10 h-10 border-4 border-gray-200 border-t-[#1a6b32] rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-700 font-medium">Buscando historia clínica...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de ver plan quirúrgico */}
+      {showPlanModal && planParaVer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl my-8">
+            {/* Header */}
+            <div className="p-6 border-b bg-[#1a6b32] text-white rounded-t-lg">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-2xl font-bold mb-1">Historia Clínica</h2>
+                  <p className="text-green-100">
+                    {planParaVer.datos_paciente?.nombre_completo || planParaVer.nombre || 'Paciente'}
+                  </p>
+                  <p className="text-sm text-green-100">
+                    Documento: {planParaVer.datos_paciente?.identificacion || planParaVer.identificacion || '—'}
+                  </p>
+                </div>
+                <button onClick={() => { setShowPlanModal(false); setPlanParaVer(null); setEsquemaUrlModal('') }} className="text-white hover:text-gray-200 text-2xl font-bold">
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6 max-h-[calc(90vh-200px)] overflow-y-auto">
+              {/* Datos del paciente */}
+              <section className="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <h3 className="text-lg font-bold text-[#1a6b32] mb-3 flex items-center gap-2">
+                  <User className="w-5 h-5" />
+                  Datos del Paciente
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-semibold text-gray-600">Nombre</label>
+                    <p className="text-gray-800">{planParaVer.datos_paciente?.nombre_completo || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold text-gray-600">Identificación</label>
+                    <p className="text-gray-800">{planParaVer.datos_paciente?.identificacion || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold text-gray-600">Fecha Consulta</label>
+                    <p className="text-gray-800">{planParaVer.datos_paciente?.fecha_consulta || '—'}</p>
+                  </div>
+                  {planParaVer.datos_paciente?.peso && (
+                    <div>
+                      <label className="text-sm font-semibold text-gray-600">Peso</label>
+                      <p className="text-gray-800">{planParaVer.datos_paciente.peso} kg</p>
+                    </div>
+                  )}
+                  {planParaVer.datos_paciente?.altura && (
+                    <div>
+                      <label className="text-sm font-semibold text-gray-600">Altura</label>
+                      <p className="text-gray-800">{planParaVer.datos_paciente.altura} m</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Historia Clínica */}
+              {planParaVer.historia_clinica && (
+                <section className="mb-6 p-4 bg-gray-50 rounded-lg border">
+                  <h3 className="text-lg font-bold text-[#1a6b32] mb-3 flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Historia Clínica
+                  </h3>
+                  <div className="space-y-3">
+                    {planParaVer.historia_clinica.motivo_consulta && (
+                      <div>
+                        <label className="text-sm font-semibold text-gray-600">Motivo de Consulta</label>
+                        <p className="text-gray-800 whitespace-pre-wrap bg-white p-2 rounded border text-sm">{planParaVer.historia_clinica.motivo_consulta}</p>
+                      </div>
+                    )}
+                    {planParaVer.historia_clinica.diagnostico && (
+                      <div>
+                        <label className="text-sm font-semibold text-gray-600">Diagnóstico</label>
+                        <p className="text-gray-800 whitespace-pre-wrap bg-white p-2 rounded border text-sm">{planParaVer.historia_clinica.diagnostico}</p>
+                      </div>
+                    )}
+                    {planParaVer.historia_clinica.plan_conducta && (
+                      <div>
+                        <label className="text-sm font-semibold text-gray-600">Plan de Conducta</label>
+                        <p className="text-gray-800 whitespace-pre-wrap bg-white p-2 rounded border text-sm">{planParaVer.historia_clinica.plan_conducta}</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* Esquema */}
+              <section className="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <h3 className="text-lg font-bold text-[#1a6b32] mb-3">Esquema Quirúrgico</h3>
+                {esquemaUrlModal ? (
+                  <div className="bg-white p-3 rounded border text-center">
+                    <img src={esquemaUrlModal} alt="Esquema quirúrgico" className="max-w-full max-h-[400px] object-contain mx-auto rounded border" />
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">No se encontró imagen de esquema</p>
+                )}
+              </section>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t flex flex-wrap justify-end gap-3 bg-gray-50 rounded-b-lg">
+              <button
+                onClick={() => {
+                  const pacId = planParaVer.id_paciente || planParaVer.datos_paciente?.id
+                  setShowPlanModal(false)
+                  router.push(`/dashboard/historias-clinicas?pacienteId=${pacId}`)
+                }}
+                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-2 text-sm"
+              >
+                <Camera className="w-4 h-4" />
+                Agregar Fotos
+              </button>
+              <button
+                onClick={() => {
+                  setShowPlanModal(false)
+                  const planId = String(planParaVer.id).replace('plan_', '')
+                  router.push(`/dashboard/plan-quirurgico?verPlan=${planId}`)
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 text-sm"
+              >
+                <Eye className="w-4 h-4" />
+                Ver Completo
+              </button>
+              <button
+                onClick={() => { setShowPlanModal(false); setPlanParaVer(null); setEsquemaUrlModal('') }}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 text-sm"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </ProtectedRoute>
+  )
+}

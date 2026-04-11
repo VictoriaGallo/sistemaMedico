@@ -1,0 +1,2288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Esquemas Corporales Interactivos</title>
+  
+  <!-- SOLUCIÓN DEFINITIVA Y COMPLETA PARA ERRORES DE EXTENSIONES -->
+  <script>
+    (function() {
+      // 1. PREVENCIÓN TOTAL - Interceptar TODAS las llamadas a getAttribute
+      const originalGetAttribute = Element.prototype.getAttribute;
+      Element.prototype.getAttribute = function(name) {
+        try {
+          if (!this || this === null || this === undefined) {
+            return null;
+          }
+          return originalGetAttribute.call(this, name);
+        } catch (e) {
+          return null;
+        }
+      };
+      
+      // 2. PREVENIR que FilterContent cause errores
+      class FilterContent {
+        constructor(element) {
+          if (!element) return; // ← ESTA LÍNEA ES CLAVE
+
+          this.element = element;
+          this.type = element.getAttribute('data-type');
+          // resto del código
+        }
+      }
+
+      const filterEl = document.querySelector('.filter-content');
+      if (filterEl) {
+        new FilterContent(filterEl);
+      }
+
+      
+      // 3. INTERCEPTAR TODOS LOS ERRORES GLOBALMENTE
+      const originalOnerror = window.onerror;
+      window.onerror = function(msg, url, line, col, error) {
+        if (msg && typeof msg === 'string') {
+          if (msg.includes('filter_content.js') || 
+              msg.includes('FilterContent') ||
+              msg.includes('getAttribute')) {
+            return true;
+          }
+        }
+        if (originalOnerror) {
+          return originalOnerror(msg, url, line, col, error);
+        }
+        return false;
+      };
+    })();
+  </script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 10px;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .header-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 10px;
+      background: white;
+    }
+
+    .title-container {
+      flex: 1;
+    }
+
+    h1 {
+      text-align: left;
+      color: #2E7D32;
+      margin-bottom: 5px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+      font-weight: 400;
+    }
+
+    .logo-container {
+      width: 200px;
+      height: 80px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: white;
+      border-radius: 8px;
+      padding: 10px;
+      border: 1px solid #4CAF50;
+    }
+
+    .logo-img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .clinic-name {
+      position: absolute;
+      bottom: 5px;
+      right: 8px;
+      color: #2E7D32;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 3px 6px;
+      border-radius: 3px;
+    }
+
+    .controls-panel {
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 8px rgba(76, 175, 80, 0.1);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #E8F5E9;
+    }
+
+    .control-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .control-group label {
+      font-weight: 600;
+      color: #2E7D32;
+      font-size: 14px;
+    }
+
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn-undo {
+      background: linear-gradient(135deg, #FF9800, #F57C00);
+      color: white;
+    }
+
+    .btn-reset {
+      background: linear-gradient(135deg, #F44336, #D32F2F);
+      color: white;
+    }
+
+    .btn-draw {
+      background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+      color: white;
+    }
+
+    .btn-draw.active {
+      background: linear-gradient(135deg, #6A1B9A, #4A148C);
+    }
+
+    .btn-text {
+      background: linear-gradient(135deg, #4CAF50, #388E3C);
+      color: white;
+    }
+
+    .btn-text.active {
+      background: linear-gradient(135deg, #2E7D32, #1B5E20);
+    }
+
+    .btn-line {
+      background: linear-gradient(135deg, #FF5722, #E64A19);
+      color: white;
+    }
+
+    .btn-line.active {
+      background: linear-gradient(135deg, #D84315, #BF360C);
+    }
+
+    .btn-arrow-text {
+      background: linear-gradient(135deg, #00BCD4, #0097A7);
+      color: white;
+    }
+
+    .btn-arrow-text.active {
+      background: linear-gradient(135deg, #00838F, #006064);
+    }
+
+    .btn-print {
+      background: linear-gradient(135deg, #FF9800, #F57C00);
+      color: white;
+      margin-left: 10px;
+    }
+
+    .procedure-selector {
+      display: flex;
+      gap: 8px;
+    }
+
+    .procedure-option {
+      padding: 8px 16px;
+      border: 1px solid #C8E6C9;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 600;
+      color: #2E7D32;
+      background: #F1F8E9;
+      min-width: 140px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .procedure-option.active {
+      border-color: #4CAF50;
+      background: #E8F5E9;
+      color: #1B5E20;
+    }
+
+    .legend-pattern {
+      width: 30px;
+      height: 25px;
+      border: 1px solid #C8E6C9;
+      border-radius: 4px;
+    }
+
+    /* MODIFICACIÓN PRINCIPAL: Diseño compacto */
+    .main-content {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .plan-section {
+      flex: 3;
+    }
+
+    .logo-right-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .surgical-plan-container {
+      background: white;
+      border-radius: 8px;
+      padding: 0;
+      width: 100%;
+      position: relative;
+    }
+
+    /* Contenedor para cuerpo y cabeza lado a lado */
+    .body-head-container {
+      display: flex;
+      gap: 15px;
+      align-items: flex-start;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 0;
+    }
+
+    .schema-section {
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      flex: 1;
+      min-width: 300px;
+      max-width: 500px;
+      border: 1px solid #E8F5E9;
+    }
+
+    .schema-section h3 {
+      text-align: center;
+      color: #2E7D32;
+      margin-bottom: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #C8E6C9;
+    }
+
+    .svg-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 350px;
+      width: 100%;
+      padding: 8px;
+      background: white;
+      border-radius: 6px;
+    }
+
+    .svg-container object {
+      max-width: 100%;
+      height: auto;
+      max-height: 400px;
+    }
+
+    /* Sección del logo derecho */
+    .logo-display-section {
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      border: 1px solid #4CAF50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 180px;
+      margin-bottom: 10px;
+    }
+
+    .logo-large-container {
+      width: 100%;
+      height: 120px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: white;
+      border-radius: 6px;
+      padding: 10px;
+      border: 1px solid #4CAF50;
+    }
+
+    .logo-large {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .info-box {
+      background: #E8F5E9;
+      border-radius: 8px;
+      padding: 15px;
+      border: 1px solid #4CAF50;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .info-title {
+      color: #1B5E20;
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-align: center;
+      border-bottom: 1px solid #4CAF50;
+      padding-bottom: 8px;
+    }
+
+    .info-content {
+      color: #2E7D32;
+      font-size: 12px;
+      line-height: 1.4;
+      text-align: center;
+    }
+
+    /* Styling for clickable zones */
+    .zone {
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .zone:hover {
+      opacity: 0.8;
+    }
+
+    /* Prevent text from capturing clicks */
+    text {
+      pointer-events: none !important;
+    }
+
+    .drawing-mode {
+      cursor: crosshair !important;
+    }
+
+    .free-draw-path {
+      pointer-events: none;
+    }
+
+    .text-mode {
+      cursor: text !important;
+    }
+
+    /* Added input modal styles for text entry */
+    .text-input-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+      z-index: 1000;
+      display: none;
+      border: 1px solid #4CAF50;
+      min-width: 300px;
+    }
+
+    .text-input-modal.active {
+      display: block;
+    }
+
+    .text-input-modal h3 {
+      color: #1B5E20;
+      margin-bottom: 15px;
+      text-align: center;
+      font-size: 16px;
+    }
+
+    .text-input-modal input {
+      width: 100%;
+      padding: 8px;
+      font-size: 14px;
+      border: 1px solid #C8E6C9;
+      border-radius: 6px;
+      margin-bottom: 15px;
+    }
+
+    .text-input-modal .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .text-input-modal button {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 999;
+      display: none;
+    }
+
+    .modal-overlay.active {
+      display: block;
+    }
+
+    /* Added slider control styles */
+    .slider-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #F1F8E9;
+      border-radius: 6px;
+      border: 1px solid #C8E6C9;
+      min-width: 200px;
+    }
+
+    .slider-control label {
+      font-size: 14px;
+      min-width: 80px;
+      color: #2E7D32;
+      font-weight: 600;
+    }
+
+    .slider-control input[type="range"] {
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: #C8E6C9;
+      outline: none;
+      cursor: pointer;
+      -webkit-appearance: none;
+    }
+
+    .slider-control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #4CAF50;
+      cursor: pointer;
+      border: 2px solid white;
+    }
+
+    .slider-control .value-display {
+      font-weight: 700;
+      color: #1B5E20;
+      min-width: 30px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    /* Estilos para los nuevos botones numéricos */
+    .number-controls {
+      display: flex;
+      gap: 8px;
+      margin-left: 10px;
+    }
+
+    .btn-number {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #6b7280;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-number.active {
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-number-1 { background: #3b82f6; }
+    .btn-number-2 { background: #10b981; }
+    .btn-number-3 { background: #8b5cf6; }
+    .btn-number-4 { background: #f59e0b; }
+    .btn-number-5 { background: #ef4444; }
+    .btn-number-6 { background: #06b6d4; }
+    .btn-number-7 { background: #8b5cf6; }
+
+    /* Botón de depuración */
+    .debug-btn {
+      background: #6b7280;
+      color: white;
+      font-size: 12px;
+      padding: 8px 12px;
+    }
+
+    /* Botón de retorno fijo */
+    .btn-return {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: #1a6b32;
+      color: white;
+      padding: 8px 15px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* Estilos para el selector de color del trazo */
+    .color-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #F1F8E9;
+      border-radius: 6px;
+      border: 1px solid #C8E6C9;
+      min-width: 220px;
+    }
+
+    .color-selector label {
+      font-size: 14px;
+      min-width: 80px;
+      color: #2E7D32;
+      font-weight: 600;
+    }
+
+    .color-options {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .color-option {
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .color-option.active {
+      border: 1px solid #333;
+    }
+
+    /* ============================================= */
+    /* ESTILOS ESPECÍFICOS PARA IMPRESIÓN */
+    /* ============================================= */
+    @media print {
+      body {
+        background: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      
+      .container {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      
+      .btn-return,
+      .controls-panel,
+      .modal-overlay,
+      .text-input-modal,
+      .loading-message,
+      .export-modal {
+        display: none !important;
+      }
+      
+      /* Ajustar tamaños para impresión */
+      .header-section {
+        margin-bottom: 10px !important;
+        padding: 5px !important;
+      }
+      
+      h1 {
+        font-size: 20px !important;
+        margin-bottom: 2px !important;
+      }
+      
+      .subtitle {
+        font-size: 12px !important;
+      }
+      
+      .logo-container {
+        width: 150px !important;
+        height: 60px !important;
+        padding: 5px !important;
+      }
+      
+      .main-content {
+        gap: 10px !important;
+        margin-bottom: 10px !important;
+      }
+      
+      .schema-section {
+        padding: 8px !important;
+        min-width: 250px !important;
+        max-width: 400px !important;
+      }
+      
+      .schema-section h3 {
+        font-size: 14px !important;
+        margin-bottom: 5px !important;
+      }
+      
+      .svg-container {
+        min-height: 300px !important;
+        padding: 5px !important;
+      }
+      
+      .svg-container object {
+        max-height: 350px !important;
+      }
+      
+      .logo-display-section {
+        height: 150px !important;
+        padding: 10px !important;
+        margin-bottom: 8px !important;
+      }
+      
+      .logo-large-container {
+        height: 100px !important;
+        padding: 8px !important;
+      }
+      
+      .info-box {
+        padding: 10px !important;
+      }
+      
+      .info-title {
+        font-size: 14px !important;
+        margin-bottom: 8px !important;
+      }
+      
+      .info-content {
+        font-size: 11px !important;
+      }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1400px) {
+      .container {
+        max-width: 95%;
+      }
+      
+      .logo-container {
+        width: 180px;
+        height: 70px;
+      }
+      
+      .logo-display-section {
+        height: 160px;
+      }
+      
+      .logo-large-container {
+        height: 110px;
+      }
+    }
+
+    @media (max-width: 1200px) {
+      .main-content {
+        flex-direction: column;
+      }
+      
+      .logo-right-section {
+        flex-direction: row;
+        gap: 15px;
+      }
+      
+      .logo-display-section,
+      .info-box {
+        flex: 1;
+        height: auto;
+        min-height: 150px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 5px;
+      }
+      
+      .header-section {
+        flex-direction: column;
+        gap: 10px;
+      }
+      
+      .title-container {
+        text-align: center;
+      }
+      
+      h1 {
+        font-size: 20px;
+        text-align: center;
+      }
+      
+      .logo-container {
+        width: 100%;
+        max-width: 200px;
+      }
+      
+      .body-head-container {
+        flex-direction: column;
+      }
+      
+      .schema-section {
+        min-width: 100%;
+        max-width: 100%;
+      }
+      
+      .logo-right-section {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Botón de retorno fijo -->
+  <button class="btn-return" onclick="returnToForm()">
+    ← Volver
+  </button>
+
+  <div class="container">
+    <!-- Cabecera compacta -->
+    <div class="header-section">
+      <div class="title-container">
+        <h1>Esquemas Corporales Interactivos</h1>
+        <p class="subtitle">Sistema de planificación quirúrgica profesional</p>
+      </div>
+      <div class="logo-container">
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQceqGrv0esgBkN1C8B_p7qsRJaV-zVHVk0sw&s"
+             alt="Logo del Consultorio" class="logo-img">
+        <div class="clinic-name">CONSULTORIO MÉDICO</div>
+      </div>
+      <button id="btnGuardarEsquema" style="display:none; background:#1a6b32; color:white; border:none; padding:10px 24px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:14px; margin-left:10px;">
+        Guardar Esquema
+      </button>
+    </div>
+
+    <!-- Contenido principal compacto -->
+    <div class="main-content">
+      <!-- Sección del plan quirúrgico -->
+      <div class="plan-section">
+        <div class="surgical-plan-container">
+          <!-- Quitado: <h2 class="surgical-plan-title">Plan Quirúrgico a Realizar</h2> -->
+          
+          <div class="body-head-container">
+            <!-- Esquema Corporal -->
+            <div class="schema-section">
+              <h3>Esquema Corporal</h3>
+              <div class="svg-container">
+                <object id="body-schema" data="schema.svg" type="image/svg+xml" width="700" height="850">
+                  Tu navegador no soporta SVG
+                </object>
+              </div>
+            </div>
+
+            <!-- Esquema Facial -->
+            <div class="schema-section">
+              <h3>Esquema Facial</h3>
+              <div class="svg-container">
+                <object id="facial-schema" data="schema-facial.svg" type="image/svg+xml" width="700" height="850">
+                  Tu navegador no soporta SVG
+                </object>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sección del logo e información (vacía como solicitaste) -->
+      <div class="logo-right-section">
+        <!-- Sección del logo grande -->
+        <!-- Sección de información -->
+      </div>
+    </div>
+    
+    <div class="controls-panel">
+      <div class="control-group">
+        <button class="btn-undo" onclick="undoLastSelection()">Deshacer</button>
+        <button class="btn-reset" onclick="resetAllSelections()">Reestablecer</button>
+        <button class="btn-draw" onclick="toggleDrawingMode()">✏️ Trazo Libre</button>
+        <button class="btn-line" onclick="toggleLineMode()">📏 Línea Recta</button>
+        <button class="btn-text" onclick="toggleTextMode()">📝 Texto</button>
+        <button class="btn-arrow-text" onclick="toggleArrowTextMode()">🏷️ Texto + Flecha</button>
+        <button class="btn-print" onclick="simpleBackupExport()">
+          🖨️ Imprimir
+        </button>
+      </div>
+
+      <!-- Contenedor para los botones numéricos del 1 al 7 -->
+      <div class="number-controls">
+        <button class="btn-number btn-number-1" onclick="toggleElement(1)">1</button>
+        <button class="btn-number btn-number-2" onclick="toggleElement(2)">2</button>
+        <button class="btn-number btn-number-3" onclick="toggleElement(3)">3</button>
+        <button class="btn-number btn-number-4" onclick="toggleElement(4)">4</button>
+        <button class="btn-number btn-number-5" onclick="toggleElement(5)">5</button>
+        <button class="btn-number btn-number-6" onclick="toggleElement(6)">6</button>
+        <button class="btn-number btn-number-7" onclick="toggleElement(7)">7</button>
+      </div>
+
+      <!-- Botón para depuración -->
+      <button class="debug-btn" onclick="logAllElements()">
+        🔍 Ver Elementos
+      </button>
+
+      <!-- Controles para el trazo libre -->
+      <div class="slider-control">
+        <label>Grosor:</label>
+        <input type="range" id="strokeSlider" min="1" max="10" value="3" oninput="updateStrokeWidth(this.value)">
+        <span class="value-display" id="strokeValue">3</span>
+      </div>
+
+      <!-- Selector de color para el trazo libre -->
+      <div class="color-selector">
+        <label>Color:</label>
+        <div class="color-options">
+          <div class="color-option active" style="background: #000000;" data-color="#000000" onclick="selectStrokeColor('#000000')"></div>
+          <div class="color-option" style="background: #FF0000;" data-color="#FF0000" onclick="selectStrokeColor('#FF0000')"></div>
+          <div class="color-option" style="background: #0000FF;" data-color="#0000FF" onclick="selectStrokeColor('#0000FF')"></div>
+          <div class="color-option" style="background: #008000;" data-color="#008000" onclick="selectStrokeColor('#008000')"></div>
+        </div>
+      </div>
+
+      <div class="slider-control">
+        <label>Tamaño texto:</label>
+        <input type="range" id="textSizeSlider" min="4" max="48" value="16" oninput="updateTextSize(this.value)">
+        <span class="value-display" id="textSizeValue">16</span>
+      </div>
+
+      <div class="control-group">
+        <label>Procedimiento:</label>
+        <div class="procedure-selector">
+          <div class="procedure-option active" data-procedure="liposuction" onclick="selectProcedure('liposuction')">
+            <svg class="legend-pattern" viewBox="0 0 30 25">
+              <defs>
+                <pattern id="legend-lipo" patternUnits="userSpaceOnUse" width="3" height="3" patternTransform="rotate(45)">
+                  <line x1="0" y1="0" x2="0" y2="3" stroke="#FF0000" stroke-width="2"/>
+                </pattern>
+              </defs>
+              <rect width="30" height="25" fill="url(#legend-lipo)"/>
+            </svg>
+            <span>Liposucción</span>
+          </div>
+          <div class="procedure-option" data-procedure="lipotransfer" onclick="selectProcedure('lipotransfer')">
+            <svg class="legend-pattern" viewBox="0 0 30 25">
+              <defs>
+                <pattern id="legend-transfer" patternUnits="userSpaceOnUse" width="2.5" height="2.5">
+                  <line x1="0" y1="0" x2="0" y2="2.5" stroke="#0000FF" stroke-width="1.5"/>
+                  <line x1="0" y1="0" x2="2.5" y2="0" stroke="#0000FF" stroke-width="1.5"/>
+                </pattern>
+              </defs>
+              <rect width="30" height="25" fill="url(#legend-transfer)"/>
+            </svg>
+            <span>Lipotransferencia</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para entrada de texto -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeTextModal()"></div>
+  <div class="text-input-modal" id="textModal">
+    <h3>Agregar Texto</h3>
+    <input type="text" id="textInput" placeholder="Escribe el texto aquí..." maxlength="50">
+    <div class="modal-buttons">
+      <button onclick="closeTextModal()" style="background: #6b7280; color: white;">Cancelar</button>
+      <button onclick="addTextToSVG()" style="background: #4CAF50; color: white;">Agregar</button>
+    </div>
+  </div>
+
+  <!-- Mensaje de carga -->
+  <div class="loading-message" id="loadingMessage">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div class="spinner"></div>
+      <span style="font-size: 14px;">Generando imagen...</span>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <script>
+// Código JavaScript (se mantiene igual que antes, solo se incluye para completitud)
+// =============================================
+// FUNCIÓN SIMPLIFICADA Y CONFIABLE PARA GUARDAR PDF
+// =============================================
+async function saveAsPDF() {
+  const loading = document.getElementById('loadingMessage');
+  loading.classList.add('active');
+  
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  try {
+    const mainContent = document.querySelector('.main-content');
+    if (!mainContent) {
+      throw new Error('No se encontró el contenido principal');
+    }
+    
+    const tempContainer = document.createElement('div');
+    tempContainer.style.cssText = `
+      position: fixed;
+      top: -9999px;
+      left: -9999px;
+      width: 794px;
+      background: white;
+      padding: 20px;
+      z-index: -9999;
+    `;
+    
+    const contentClone = mainContent.cloneNode(true);
+    
+    contentClone.style.cssText = `
+      display: flex;
+      gap: 15px;
+      margin: 0;
+    `;
+    
+    tempContainer.appendChild(contentClone);
+    document.body.appendChild(tempContainer);
+    
+    try {
+      const canvas = await html2canvas(tempContainer, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        allowTaint: true,
+        foreignObjectRendering: false
+      });
+      
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const pageWidth = 297;
+      const pageHeight = 210;
+      const margin = 10;
+      const contentWidth = pageWidth - (margin * 2);
+      
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      const imgWidth = contentWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
+      
+      const fileName = `plan-quirurgico-${Date.now()}.pdf`;
+      pdf.save(fileName);
+      
+    } finally {
+      if (tempContainer.parentNode) {
+        document.body.removeChild(tempContainer);
+      }
+    }
+    
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al generar PDF. Use la opción de imprimir.');
+  } finally {
+    setTimeout(() => {
+      loading.classList.remove('active');
+    }, 1000);
+  }
+}
+
+// Función de impresión simple
+function simpleBackupExport() {
+  const originalTitle = document.title;
+  document.title = 'Esquemas Corporales - ' + new Date().toLocaleDateString();
+  window.print();
+  setTimeout(() => {
+    document.title = originalTitle;
+  }, 1000);
+}
+  </script>
+
+  <script>
+// Código del editor de esquemas (se mantiene igual)
+// =============================================
+// CÓDIGO ORIGINAL DEL EDITOR DE ESQUEMAS
+// =============================================
+
+    function returnToForm() {
+      if (window.parent !== window) {
+        window.parent.postMessage({
+          type: 'CLOSE_ESQUEMA_VIEWER',
+          source: 'esquema-editor'
+        }, '*');
+      } else {
+        window.close();
+      }
+    }
+
+    const selectionHistory = [];
+    let svgDocuments = [];
+    let selectedProcedure = 'liposuction';
+    let isDrawingMode = false;
+    let isDrawing = false;
+    let currentPath = null;
+    let pathPoints = [];
+    let isTextMode = false;
+    let pendingTextPosition = null;
+    let pendingTextSvgDoc = null;
+    let currentStrokeWidth = 3;
+    let currentTextSize = 16;
+    let currentStrokeColor = '#000000';
+
+    // Línea recta
+    let isLineMode = false;
+    let lineStartPoint = null;
+    let lineStartSvgDoc = null;
+    let linePreview = null;
+
+    // Texto con flecha (anotación externa)
+    let isArrowTextMode = false;
+    let arrowTextStep = 0; // 0=esperando clic origen, 1=esperando clic destino
+    let arrowOriginPoint = null;
+    let arrowOriginSvgDoc = null;
+    let arrowPreviewLine = null;
+
+    // Configuración actualizada de los elementos
+    const elementsConfig = {
+      1: {
+        id: 'g68',
+        label: 'circular-pezon-izquierdo',
+        type: 'group'
+      },
+      2: {
+        id: 'g67',
+        label: 'circular-pezon-derecho',
+        type: 'group'
+      },
+      3: {
+        id: 'g65',
+        label: 'incision-circular-pezon-izquierdo',
+        type: 'group'
+      },
+      4: {
+        id: 'g65-5',
+        label: 'incision-circular-pezon-derecho',
+        type: 'group'
+      },
+      5: {
+        id: 'path63-5',
+        label: 'incicion-i',
+        type: 'path'
+      },
+      6: {
+        id: 'path65-6',
+        label: 'incision-d',
+        type: 'path'
+      },
+      7: {
+        id: 'path38',
+        label: 'elipse-abdominal',
+        type: 'ellipse'
+      }
+    };
+
+    const elementStates = {
+      1: false,
+      2: false,
+      3: false,
+      4: false,
+      5: false,
+      6: false,
+      7: false
+    };
+
+    const numericSelectionHistory = [];
+
+    function selectStrokeColor(color) {
+      currentStrokeColor = color;
+      
+      document.querySelectorAll('.color-option').forEach(option => {
+        option.classList.remove('active');
+      });
+      
+      document.querySelector(`[data-color="${color}"]`).classList.add('active');
+    }
+
+    function findElementInSVG(svgDoc, config) {
+      let element = null;
+      
+      if (config.id) {
+        element = svgDoc.getElementById(config.id);
+      }
+      
+      if (!element && config.label) {
+        const selectors = [
+          `[inkscape\\:label="${config.label}"]`,
+          `[label="${config.label}"]`,
+          `[data-label="${config.label}"]`
+        ];
+        
+        for (const selector of selectors) {
+          element = svgDoc.querySelector(selector);
+          if (element) break;
+        }
+        
+        if (!element) {
+          const allElements = svgDoc.querySelectorAll('*');
+          for (const el of allElements) {
+            const label = el.getAttribute('inkscape:label') || 
+                         el.getAttribute('label') || 
+                         el.getAttribute('data-label');
+            if (label === config.label) {
+              element = el;
+              break;
+            }
+          }
+        }
+      }
+      
+      return element;
+    }
+
+    function activateElement(element, config) {
+      if (!element.hasAttribute('data-original-stroke')) {
+        element.setAttribute('data-original-stroke', element.getAttribute('stroke') || '');
+      }
+      if (!element.hasAttribute('data-original-stroke-opacity')) {
+        element.setAttribute('data-original-stroke-opacity', element.getAttribute('stroke-opacity') || '0');
+      }
+      if (!element.hasAttribute('data-original-fill-opacity')) {
+        element.setAttribute('data-original-fill-opacity', element.getAttribute('fill-opacity') || '0');
+      }
+      
+      element.style.stroke = '#ff0000';
+      element.style.strokeWidth = '2px';
+      element.style.strokeOpacity = '1';
+      element.setAttribute('stroke-opacity', '1');
+      element.style.fillOpacity = '0';
+      element.setAttribute('fill-opacity', '0');
+      
+      if (config.type === 'group' && element.children) {
+        Array.from(element.children).forEach(child => {
+          if (!child.hasAttribute('data-original-stroke')) {
+            child.setAttribute('data-original-stroke', child.getAttribute('stroke') || '');
+          }
+          if (!child.hasAttribute('data-original-stroke-opacity')) {
+            child.setAttribute('data-original-stroke-opacity', child.getAttribute('stroke-opacity') || '0');
+          }
+          
+          child.style.stroke = '#ff0000';
+          child.style.strokeOpacity = '1';
+          child.setAttribute('stroke-opacity', '1');
+          child.style.fillOpacity = '0';
+          child.setAttribute('fill-opacity', '0');
+        });
+      }
+    }
+
+    function deactivateSingleElement(element, config) {
+      const originalStroke = element.getAttribute('data-original-stroke');
+      const originalStrokeOpacity = element.getAttribute('data-original-stroke-opacity') || '0';
+      const originalFillOpacity = element.getAttribute('data-original-fill-opacity') || '0';
+      
+      if (originalStroke !== null) {
+        element.style.stroke = originalStroke;
+      }
+      
+      element.style.strokeOpacity = originalStrokeOpacity;
+      element.setAttribute('stroke-opacity', originalStrokeOpacity);
+      element.style.fillOpacity = originalFillOpacity;
+      element.setAttribute('fill-opacity', originalFillOpacity);
+      
+      if (config.type === 'group' && element.children) {
+        Array.from(element.children).forEach(child => {
+          const childStroke = child.getAttribute('data-original-stroke');
+          const childStrokeOpacity = child.getAttribute('data-original-stroke-opacity') || '0';
+          const childFillOpacity = child.getAttribute('data-original-fill-opacity') || '0';
+          
+          if (childStroke !== null) {
+            child.style.stroke = childStroke;
+          }
+          
+          child.style.strokeOpacity = childStrokeOpacity;
+          child.setAttribute('stroke-opacity', childStrokeOpacity);
+          child.style.fillOpacity = childFillOpacity;
+          child.setAttribute('fill-opacity', childFillOpacity);
+        });
+      }
+    }
+
+    function toggleElement(buttonNumber) {
+      const button = document.querySelector(`.btn-number-${buttonNumber}`);
+      const config = elementsConfig[buttonNumber];
+      
+      if (!config) {
+        console.error(`❌ No hay configuración para el botón ${buttonNumber}`);
+        return;
+      }
+      
+      const isActive = !elementStates[buttonNumber];
+      elementStates[buttonNumber] = isActive;
+      button.classList.toggle('active', isActive);
+      
+      let elementFound = false;
+      
+      svgDocuments.forEach(svgDoc => {
+        if (!svgDoc) return;
+        
+        const element = findElementInSVG(svgDoc, config);
+        
+        if (element) {
+          elementFound = true;
+          
+          if (isActive) {
+            activateElement(element, config);
+            
+            numericSelectionHistory.push({
+              buttonNumber: buttonNumber,
+              element: element,
+              config: config,
+              svgDoc: svgDoc
+            });
+          } else {
+            deactivateSingleElement(element, config);
+            
+            const index = numericSelectionHistory.findIndex(item => 
+              item.buttonNumber === buttonNumber && item.element === element
+            );
+            if (index > -1) {
+              numericSelectionHistory.splice(index, 1);
+            }
+          }
+        }
+      });
+      
+      if (!elementFound) {
+        elementStates[buttonNumber] = !isActive;
+        button.classList.toggle('active', !isActive);
+      }
+    }
+
+    function updateStrokeWidth(value) {
+      currentStrokeWidth = value;
+      document.getElementById('strokeValue').textContent = value;
+    }
+
+    function updateTextSize(value) {
+      currentTextSize = value;
+      document.getElementById('textSizeValue').textContent = value;
+    }
+
+    function selectProcedure(procedure) {
+      selectedProcedure = procedure;
+      
+      document.querySelectorAll('.procedure-option').forEach(option => {
+        option.classList.remove('active');
+      });
+      
+      document.querySelector(`[data-procedure="${procedure}"]`).classList.add('active');
+    }
+
+    function getSelectedProcedure() {
+      return selectedProcedure;
+    }
+
+    function toggleDrawingMode() {
+      isDrawingMode = !isDrawingMode;
+      const btn = document.querySelector('.btn-draw');
+
+      if (isDrawingMode) {
+        // Desactivar otros modos
+        if (isLineMode) toggleLineMode();
+        if (isArrowTextMode) toggleArrowTextMode();
+        if (isTextMode) toggleTextMode();
+
+        btn.classList.add('active');
+        btn.textContent = '✏️ Trazo Libre (ON)';
+        svgDocuments.forEach(doc => {
+          doc.documentElement.classList.add('drawing-mode');
+        });
+      } else {
+        btn.classList.remove('active');
+        btn.textContent = '✏️ Trazo Libre';
+        svgDocuments.forEach(doc => {
+          doc.documentElement.classList.remove('drawing-mode');
+        });
+      }
+    }
+
+    function removeFreeDrawPath(pathElement) {
+      if (pathElement && pathElement.parentNode) {
+        pathElement.parentNode.removeChild(pathElement);
+      }
+    }
+
+    function toggleTextMode() {
+      isTextMode = !isTextMode;
+      const btn = document.querySelector('.btn-text');
+
+      if (isTextMode) {
+        // Desactivar otros modos
+        if (isDrawingMode) toggleDrawingMode();
+        if (isLineMode) toggleLineMode();
+        if (isArrowTextMode) toggleArrowTextMode();
+
+        btn.classList.add('active');
+        btn.textContent = '📝 Texto (ON)';
+        svgDocuments.forEach(doc => {
+          doc.documentElement.classList.add('text-mode');
+        });
+      } else {
+        btn.classList.remove('active');
+        btn.textContent = '📝 Texto';
+        svgDocuments.forEach(doc => {
+          doc.documentElement.classList.remove('text-mode');
+        });
+      }
+    }
+
+    // ─── Línea recta ───
+    function toggleLineMode() {
+      isLineMode = !isLineMode;
+      const btn = document.querySelector('.btn-line');
+
+      if (isLineMode) {
+        // Desactivar otros modos
+        if (isDrawingMode) toggleDrawingMode();
+        if (isTextMode) toggleTextMode();
+        if (isArrowTextMode) toggleArrowTextMode();
+
+        btn.classList.add('active');
+        btn.textContent = '📏 Línea Recta (ON)';
+        svgDocuments.forEach(doc => {
+          doc.documentElement.style.cursor = 'crosshair';
+        });
+      } else {
+        btn.classList.remove('active');
+        btn.textContent = '📏 Línea Recta';
+        lineStartPoint = null;
+        lineStartSvgDoc = null;
+        if (linePreview && linePreview.parentNode) {
+          linePreview.parentNode.removeChild(linePreview);
+          linePreview = null;
+        }
+        svgDocuments.forEach(doc => {
+          doc.documentElement.style.cursor = '';
+        });
+      }
+    }
+
+    // ─── Texto con flecha (anotación externa) ───
+    function toggleArrowTextMode() {
+      isArrowTextMode = !isArrowTextMode;
+      const btn = document.querySelector('.btn-arrow-text');
+
+      if (isArrowTextMode) {
+        // Desactivar otros modos
+        if (isDrawingMode) toggleDrawingMode();
+        if (isTextMode) toggleTextMode();
+        if (isLineMode) toggleLineMode();
+
+        arrowTextStep = 0;
+        btn.classList.add('active');
+        btn.textContent = '🏷️ Flecha: clic en zona';
+        svgDocuments.forEach(doc => {
+          doc.documentElement.style.cursor = 'crosshair';
+        });
+      } else {
+        btn.classList.remove('active');
+        btn.textContent = '🏷️ Texto + Flecha';
+        arrowTextStep = 0;
+        arrowOriginPoint = null;
+        arrowOriginSvgDoc = null;
+        if (arrowPreviewLine && arrowPreviewLine.parentNode) {
+          arrowPreviewLine.parentNode.removeChild(arrowPreviewLine);
+          arrowPreviewLine = null;
+        }
+        svgDocuments.forEach(doc => {
+          doc.documentElement.style.cursor = '';
+        });
+      }
+    }
+
+    function createArrowWithText(svgDoc, x1, y1, x2, y2, text) {
+      const group = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
+      group.classList.add('arrow-text-annotation');
+
+      // Línea de la flecha
+      const line = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('stroke', currentStrokeColor);
+      line.setAttribute('stroke-width', currentStrokeWidth);
+      line.setAttribute('marker-end', 'url(#arrowhead-' + currentStrokeColor.replace('#', '') + ')');
+
+      // Crear marker (punta de flecha) si no existe
+      const markerId = 'arrowhead-' + currentStrokeColor.replace('#', '');
+      if (!svgDoc.getElementById(markerId)) {
+        let defs = svgDoc.querySelector('defs');
+        if (!defs) {
+          defs = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'defs');
+          svgDoc.documentElement.insertBefore(defs, svgDoc.documentElement.firstChild);
+        }
+        const marker = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'marker');
+        marker.setAttribute('id', markerId);
+        marker.setAttribute('markerWidth', '10');
+        marker.setAttribute('markerHeight', '7');
+        marker.setAttribute('refX', '10');
+        marker.setAttribute('refY', '3.5');
+        marker.setAttribute('orient', 'auto');
+        const polygon = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
+        polygon.setAttribute('fill', currentStrokeColor);
+        marker.appendChild(polygon);
+        defs.appendChild(marker);
+      }
+
+      group.appendChild(line);
+
+      // Texto en la posición del destino (x1,y1 es origen en la zona, x2,y2 es donde va el texto)
+      const textEl = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'text');
+      // Posicionar texto un poco después de la punta de la flecha
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const offsetX = (dx / len) * 12;
+      const offsetY = (dy / len) * 12;
+      textEl.setAttribute('x', x2 + offsetX);
+      textEl.setAttribute('y', y2 + offsetY);
+      textEl.setAttribute('fill', currentStrokeColor);
+      textEl.setAttribute('font-size', currentTextSize);
+      textEl.setAttribute('font-family', 'Arial, sans-serif');
+      textEl.setAttribute('font-weight', 'bold');
+      textEl.textContent = text;
+
+      group.appendChild(textEl);
+      svgDoc.documentElement.appendChild(group);
+
+      selectionHistory.push({
+        element: group,
+        type: 'arrowtext'
+      });
+    }
+
+    function openTextModal(x, y, svgDoc) {
+      pendingTextPosition = { x, y };
+      pendingTextSvgDoc = svgDoc;
+      
+      document.getElementById('modalOverlay').classList.add('active');
+      document.getElementById('textModal').classList.add('active');
+      document.getElementById('textInput').value = '';
+      document.getElementById('textInput').focus();
+    }
+
+    function closeTextModal() {
+      document.getElementById('modalOverlay').classList.remove('active');
+      document.getElementById('textModal').classList.remove('active');
+      pendingTextPosition = null;
+      pendingTextSvgDoc = null;
+    }
+
+    function addTextToSVG() {
+      const textValue = document.getElementById('textInput').value.trim();
+
+      if (!textValue || !pendingTextPosition || !pendingTextSvgDoc) {
+        closeTextModal();
+        return;
+      }
+
+      // Caso: texto con flecha (anotación externa)
+      if (pendingTextPosition._isArrowText && pendingTextPosition._arrowOrigin) {
+        const origin = pendingTextPosition._arrowOrigin;
+        createArrowWithText(
+          pendingTextSvgDoc,
+          origin.x, origin.y,
+          pendingTextPosition.x, pendingTextPosition.y,
+          textValue
+        );
+        closeTextModal();
+        return;
+      }
+
+      // Caso normal: solo texto
+      const textElement = pendingTextSvgDoc.createElementNS('http://www.w3.org/2000/svg', 'text');
+      textElement.setAttribute('x', pendingTextPosition.x);
+      textElement.setAttribute('y', pendingTextPosition.y);
+      textElement.setAttribute('fill', '#1B5E20');
+      textElement.setAttribute('font-size', currentTextSize);
+      textElement.setAttribute('font-family', 'Arial, sans-serif');
+      textElement.setAttribute('font-weight', 'bold');
+      textElement.textContent = textValue;
+      textElement.classList.add('user-added-text');
+
+      pendingTextSvgDoc.documentElement.appendChild(textElement);
+
+      selectionHistory.push({
+        element: textElement,
+        type: 'text'
+      });
+
+      closeTextModal();
+    }
+
+    function removeTextElement(textElement) {
+      if (textElement && textElement.parentNode) {
+        textElement.parentNode.removeChild(textElement);
+      }
+    }
+
+    function removeElement(el) {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    }
+
+    function undoLastSelection() {
+      if (selectionHistory.length > 0) {
+        const lastSelection = selectionHistory.pop();
+        if (lastSelection.type === 'zone') {
+          removeProcedurePattern(lastSelection.element);
+        } else if (lastSelection.type === 'freedraw') {
+          removeFreeDrawPath(lastSelection.element);
+        } else if (lastSelection.type === 'text') {
+          removeTextElement(lastSelection.element);
+        } else if (lastSelection.type === 'straightline' || lastSelection.type === 'arrowtext') {
+          removeElement(lastSelection.element);
+        }
+        return;
+      }
+
+      if (numericSelectionHistory.length > 0) {
+        const lastNumericSelection = numericSelectionHistory.pop();
+        if (lastNumericSelection) {
+          deactivateElement(lastNumericSelection.buttonNumber);
+        }
+      }
+    }
+
+    function resetAllSelections() {
+      selectionHistory.forEach(selection => {
+        if (selection.type === 'zone') {
+          removeProcedurePattern(selection.element);
+        } else if (selection.type === 'freedraw') {
+          removeFreeDrawPath(selection.element);
+        } else if (selection.type === 'text') {
+          removeTextElement(selection.element);
+        } else if (selection.type === 'straightline' || selection.type === 'arrowtext') {
+          removeElement(selection.element);
+        }
+      });
+      
+      for (let i = 1; i <= 7; i++) {
+        const button = document.querySelector(`.btn-number-${i}`);
+        if (button) button.classList.remove('active');
+        elementStates[i] = false;
+      }
+      
+      numericSelectionHistory.length = 0;
+      selectionHistory.length = 0;
+    }
+
+    function startDrawing(e, svgDoc) {
+      // ─── Texto con flecha ───
+      if (isArrowTextMode) {
+        const pt = getSVGPoint(e, svgDoc);
+        if (arrowTextStep === 0) {
+          // Primer clic: origen (en la zona del cuerpo)
+          arrowOriginPoint = pt;
+          arrowOriginSvgDoc = svgDoc;
+          arrowTextStep = 1;
+          document.querySelector('.btn-arrow-text').textContent = '🏷️ Flecha: clic destino';
+
+          // Preview line
+          arrowPreviewLine = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'line');
+          arrowPreviewLine.setAttribute('x1', pt.x);
+          arrowPreviewLine.setAttribute('y1', pt.y);
+          arrowPreviewLine.setAttribute('x2', pt.x);
+          arrowPreviewLine.setAttribute('y2', pt.y);
+          arrowPreviewLine.setAttribute('stroke', currentStrokeColor);
+          arrowPreviewLine.setAttribute('stroke-width', currentStrokeWidth);
+          arrowPreviewLine.setAttribute('stroke-dasharray', '5,5');
+          arrowPreviewLine.setAttribute('opacity', '0.5');
+          svgDoc.documentElement.appendChild(arrowPreviewLine);
+        } else {
+          // Segundo clic: destino (fuera, donde va el texto)
+          // Abrir modal de texto y al confirmar crear la flecha
+          pendingTextPosition = pt;
+          pendingTextSvgDoc = svgDoc;
+
+          // Remover preview
+          if (arrowPreviewLine && arrowPreviewLine.parentNode) {
+            arrowPreviewLine.parentNode.removeChild(arrowPreviewLine);
+            arrowPreviewLine = null;
+          }
+
+          // Abrir modal pero con handler especial
+          document.getElementById('modalOverlay').classList.add('active');
+          document.getElementById('textModal').classList.add('active');
+          document.getElementById('textInput').value = '';
+          document.getElementById('textInput').focus();
+
+          // Guardar datos para usar en addTextToSVG
+          pendingTextPosition._isArrowText = true;
+          pendingTextPosition._arrowOrigin = { x: arrowOriginPoint.x, y: arrowOriginPoint.y };
+
+          arrowTextStep = 0;
+          arrowOriginPoint = null;
+          document.querySelector('.btn-arrow-text').textContent = '🏷️ Flecha: clic en zona';
+        }
+        return;
+      }
+
+      // ─── Línea recta ───
+      if (isLineMode) {
+        const pt = getSVGPoint(e, svgDoc);
+        if (!lineStartPoint) {
+          // Primer clic: inicio de la línea
+          lineStartPoint = pt;
+          lineStartSvgDoc = svgDoc;
+          document.querySelector('.btn-line').textContent = '📏 Línea: clic fin';
+
+          // Preview
+          linePreview = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'line');
+          linePreview.setAttribute('x1', pt.x);
+          linePreview.setAttribute('y1', pt.y);
+          linePreview.setAttribute('x2', pt.x);
+          linePreview.setAttribute('y2', pt.y);
+          linePreview.setAttribute('stroke', currentStrokeColor);
+          linePreview.setAttribute('stroke-width', currentStrokeWidth);
+          linePreview.setAttribute('stroke-dasharray', '5,5');
+          linePreview.setAttribute('opacity', '0.5');
+          svgDoc.documentElement.appendChild(linePreview);
+        } else {
+          // Segundo clic: fin de la línea
+          if (linePreview && linePreview.parentNode) {
+            linePreview.parentNode.removeChild(linePreview);
+            linePreview = null;
+          }
+
+          const line = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', lineStartPoint.x);
+          line.setAttribute('y1', lineStartPoint.y);
+          line.setAttribute('x2', pt.x);
+          line.setAttribute('y2', pt.y);
+          line.setAttribute('stroke', currentStrokeColor);
+          line.setAttribute('stroke-width', currentStrokeWidth);
+          line.setAttribute('stroke-linecap', 'round');
+          line.classList.add('straight-line');
+          svgDoc.documentElement.appendChild(line);
+
+          selectionHistory.push({
+            element: line,
+            type: 'straightline'
+          });
+
+          lineStartPoint = null;
+          lineStartSvgDoc = null;
+          document.querySelector('.btn-line').textContent = '📏 Línea Recta (ON)';
+        }
+        return;
+      }
+
+      // ─── Texto ───
+      if (isTextMode) {
+        const pt = getSVGPoint(e, svgDoc);
+        openTextModal(pt.x, pt.y, svgDoc);
+        return;
+      }
+
+      // ─── Trazo libre ───
+      if (!isDrawingMode) return;
+
+      isDrawing = true;
+      pathPoints = [];
+
+      const pt = getSVGPoint(e, svgDoc);
+      pathPoints.push(pt);
+
+      currentPath = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'path');
+      currentPath.classList.add('free-draw-path');
+      currentPath.setAttribute('fill', 'none');
+      currentPath.setAttribute('stroke', currentStrokeColor);
+      currentPath.setAttribute('stroke-width', currentStrokeWidth);
+      currentPath.setAttribute('stroke-linecap', 'round');
+      currentPath.setAttribute('stroke-linejoin', 'round');
+
+      svgDoc.documentElement.appendChild(currentPath);
+    }
+
+    function continueDrawing(e, svgDoc) {
+      if (isTextMode) return;
+
+      // Preview de línea recta
+      if (isLineMode && linePreview && lineStartPoint) {
+        const pt = getSVGPoint(e, svgDoc);
+        linePreview.setAttribute('x2', pt.x);
+        linePreview.setAttribute('y2', pt.y);
+        return;
+      }
+
+      // Preview de flecha
+      if (isArrowTextMode && arrowPreviewLine && arrowTextStep === 1) {
+        const pt = getSVGPoint(e, svgDoc);
+        arrowPreviewLine.setAttribute('x2', pt.x);
+        arrowPreviewLine.setAttribute('y2', pt.y);
+        return;
+      }
+
+      if (!isDrawingMode || !isDrawing) return;
+
+      const pt = getSVGPoint(e, svgDoc);
+      pathPoints.push(pt);
+
+      updatePathData();
+    }
+
+    function stopDrawing(e, svgDoc) {
+      if (isTextMode || isLineMode || isArrowTextMode) return;
+      if (!isDrawingMode || !isDrawing) return;
+
+      isDrawing = false;
+
+      if (currentPath && pathPoints.length > 2) {
+        selectionHistory.push({
+          element: currentPath,
+          type: 'freedraw'
+        });
+      } else if (currentPath) {
+        currentPath.parentNode.removeChild(currentPath);
+      }
+
+      currentPath = null;
+      pathPoints = [];
+    }
+
+    function getSVGPoint(e, svgDoc) {
+      const svg = svgDoc.documentElement;
+      const pt = svg.createSVGPoint();
+      
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      
+      const matrix = svg.getScreenCTM().inverse();
+      return pt.matrixTransform(matrix);
+    }
+
+    function updatePathData() {
+      if (!currentPath || pathPoints.length < 2) return;
+      
+      let d = `M ${pathPoints[0].x} ${pathPoints[0].y}`;
+      
+      for (let i = 1; i < pathPoints.length - 1; i++) {
+        const xc = (pathPoints[i].x + pathPoints[i + 1].x) / 2;
+        const yc = (pathPoints[i].y + pathPoints[i + 1].y) / 2;
+        d += ` Q ${pathPoints[i].x} ${pathPoints[i].y}, ${xc} ${yc}`;
+      }
+      
+      if (pathPoints.length > 1) {
+        const last = pathPoints[pathPoints.length - 1];
+        d += ` L ${last.x} ${last.y}`;
+      }
+      
+      currentPath.setAttribute('d', d);
+    }
+
+    function createPatterns(svgDoc) {
+      let defs = svgDoc.querySelector('defs');
+      if (!defs) {
+        defs = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        svgDoc.documentElement.insertBefore(defs, svgDoc.documentElement.firstChild);
+      }
+
+      const lipoPattern = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+      lipoPattern.setAttribute('id', 'liposuction-pattern');
+      lipoPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+      lipoPattern.setAttribute('width', '3');
+      lipoPattern.setAttribute('height', '3');
+      lipoPattern.setAttribute('patternTransform', 'rotate(45)');
+      
+      const lipoLine = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'line');
+      lipoLine.setAttribute('x1', '0');
+      lipoLine.setAttribute('y1', '0');
+      lipoLine.setAttribute('x2', '0');
+      lipoLine.setAttribute('y2', '3');
+      lipoLine.setAttribute('stroke', '#FF0000');
+      lipoLine.setAttribute('stroke-width', '2');
+      
+      lipoPattern.appendChild(lipoLine);
+      defs.appendChild(lipoPattern);
+
+      const transferPattern = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+      transferPattern.setAttribute('id', 'lipotransfer-pattern');
+      transferPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+      transferPattern.setAttribute('width', '2.5');
+      transferPattern.setAttribute('height', '2.5');
+      
+      const transferLineH = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'line');
+      transferLineH.setAttribute('x1', '0');
+      transferLineH.setAttribute('y1', '0');
+      transferLineH.setAttribute('x2', '2.5');
+      transferLineH.setAttribute('y2', '0');
+      transferLineH.setAttribute('stroke', '#0000FF');
+      transferLineH.setAttribute('stroke-width', '1.5');
+      
+      const transferLineV = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'line');
+      transferLineV.setAttribute('x1', '0');
+      transferLineV.setAttribute('y1', '0');
+      transferLineV.setAttribute('x2', '0');
+      transferLineV.setAttribute('y2', '2.5');
+      transferLineV.setAttribute('stroke', '#0000FF');
+      transferLineV.setAttribute('stroke-width', '1.5');
+      
+      transferPattern.appendChild(transferLineH);
+      transferPattern.appendChild(transferLineV);
+      defs.appendChild(transferPattern);
+    }
+
+    function applyProcedurePattern(element, procedure) {
+      const originalFill = element.getAttribute('data-original-fill') || element.style.fill || element.getAttribute('fill') || '';
+      
+      element.style.fillOpacity = '1';
+      
+      if (procedure === 'liposuction') {
+        element.style.fill = 'url(#liposuction-pattern)';
+      } else if (procedure === 'lipotransfer') {
+        element.style.fill = 'url(#lipotransfer-pattern)';
+      }
+      
+      element.setAttribute('data-procedure', procedure);
+    }
+
+    function removeProcedurePattern(element) {
+      const originalFill = element.getAttribute('data-original-fill') || '';
+      element.style.fill = originalFill;
+      const originalOpacity = element.getAttribute('data-original-opacity') || '';
+      if (originalOpacity) {
+        element.style.fillOpacity = originalOpacity;
+      }
+      element.removeAttribute('data-procedure');
+    }
+
+    function initializeSchema(objectId, onReady) {
+      const objectElement = document.getElementById(objectId);
+      let initialized = false;
+
+      function doInit() {
+        if (initialized) return;
+        const svgDoc = objectElement.contentDocument;
+        if (!svgDoc || !svgDoc.documentElement) return;
+
+        // Verificar que el SVG tenga elementos reales (no solo el root)
+        if (svgDoc.querySelectorAll('*').length < 5) return;
+
+        initialized = true;
+        console.log('[INIT] ' + objectId + ' inicializado con ' + svgDoc.querySelectorAll('*').length + ' elementos');
+
+        svgDocuments.push(svgDoc);
+        createPatterns(svgDoc);
+
+        const svgElement = svgDoc.documentElement;
+
+        svgElement.style.userSelect = 'none';
+        svgElement.style.webkitUserSelect = 'none';
+
+        svgElement.addEventListener('mousedown', (e) => startDrawing(e, svgDoc));
+        svgElement.addEventListener('mousemove', (e) => continueDrawing(e, svgDoc));
+        svgElement.addEventListener('mouseup', (e) => stopDrawing(e, svgDoc));
+        svgElement.addEventListener('mouseleave', (e) => stopDrawing(e, svgDoc));
+
+        const allElements = svgDoc.querySelectorAll('*');
+        allElements.forEach(element => {
+          const label = element.getAttribute('inkscape:label');
+          if (label) {
+            const originalFill = element.style.fill || element.getAttribute('fill') || '';
+            element.setAttribute('data-original-fill', originalFill);
+
+            const originalOpacity = element.style.fillOpacity || element.getAttribute('fill-opacity') || '';
+            if (originalOpacity) {
+              element.setAttribute('data-original-opacity', originalOpacity);
+            }
+
+            element.classList.add('zone');
+            element.style.cursor = 'pointer';
+
+            element.addEventListener('click', function(e) {
+              if (isDrawingMode) {
+                e.stopPropagation();
+                return;
+              }
+
+              if (isTextMode) {
+                e.stopPropagation();
+                return;
+              }
+
+              const currentProcedure = element.getAttribute('data-procedure');
+
+              if (currentProcedure) {
+                removeProcedurePattern(this);
+
+                const index = selectionHistory.findIndex(s => s.element === this);
+                if (index > -1) {
+                  selectionHistory.splice(index, 1);
+                }
+              } else {
+                const selectedProcedure = getSelectedProcedure();
+                applyProcedurePattern(this, selectedProcedure);
+
+                selectionHistory.push({
+                  element: this,
+                  procedure: selectedProcedure,
+                  type: 'zone'
+                });
+              }
+            });
+          }
+        });
+
+        const textElements = svgDoc.querySelectorAll('text');
+        textElements.forEach(text => {
+          text.style.pointerEvents = 'none';
+          text.style.userSelect = 'none';
+          text.style.webkitUserSelect = 'none';
+        });
+
+        if (onReady) onReady();
+      }
+
+      // Usar AMBOS: load event Y polling, con guard para evitar doble init
+      objectElement.addEventListener('load', doInit);
+
+      // Polling cada 200ms hasta 10 segundos como fallback
+      let attempts = 0;
+      function poll() {
+        if (initialized || attempts > 50) return;
+        attempts++;
+        doInit();
+        setTimeout(poll, 200);
+      }
+      poll();
+    }
+
+    // Re-inicialización segura: fuerza recarga del SVG cambiando el atributo data
+    function reinitializeSchema(objectId, onReady) {
+      var obj = document.getElementById(objectId);
+      if (!obj) { if (onReady) onReady(); return; }
+
+      // Eliminar el svgDoc anterior del array
+      var oldDoc = obj.contentDocument;
+      svgDocuments = svgDocuments.filter(function(d) { return d !== oldDoc; });
+
+      // Guardar la URL original del SVG
+      var originalData = obj.getAttribute('data').split('?')[0];
+
+      // Vaciar y recargar con cache buster para forzar recarga completa
+      obj.setAttribute('data', '');
+      setTimeout(function() {
+        obj.setAttribute('data', originalData + '?t=' + Date.now());
+        obj.addEventListener('load', function onLoad() {
+          obj.removeEventListener('load', onLoad);
+          initializeSchema(objectId, onReady);
+        });
+      }, 100);
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && document.getElementById('textModal').classList.contains('active')) {
+        addTextToSVG();
+      } else if (e.key === 'Escape' && document.getElementById('textModal').classList.contains('active')) {
+        closeTextModal();
+      }
+    });
+
+    // Función para listar todos los elementos
+    function logAllElements() {
+      console.clear();
+      console.log('🔍 === ELEMENTOS DISPONIBLES ===');
+      
+      svgDocuments.forEach((svgDoc, index) => {
+        if (!svgDoc) return;
+        
+        console.log(`\n📄 SVG ${index + 1}:`);
+        
+        const elementsWithId = svgDoc.querySelectorAll('[id]');
+        console.log(`🔹 Elementos con ID (${elementsWithId.length}):`);
+        elementsWithId.forEach(el => {
+          const id = el.id;
+          const label = el.getAttribute('inkscape:label');
+          const tagName = el.tagName;
+          
+          console.log(`   - ID: "${id}" (${tagName}) ${label ? `[label: "${label}"]` : ''}`);
+        });
+      });
+    }
+
+    // Inicialización
+    document.addEventListener('DOMContentLoaded', function() {
+      let schemasLoaded = 0;
+      const totalSchemas = 2;
+
+      function onSchemaReady() {
+        schemasLoaded++;
+        if (schemasLoaded >= totalSchemas && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'ESQUEMA_LOADED',
+            source: 'esquema-editor'
+          }, '*');
+        }
+      }
+
+      initializeSchema('body-schema', onSchemaReady);
+      initializeSchema('facial-schema', onSchemaReady);
+    });
+  </script>
+
+  <!-- Script separado: botón guardar esquema - espera a que SVGs estén listos -->
+  <script>
+  (function() {
+    // Esperar a que los SVGs estén completamente inicializados antes de activar
+    function waitForSVGs(callback) {
+      var bodyObj = document.getElementById('body-schema');
+      var faceObj = document.getElementById('facial-schema');
+      if (bodyObj && faceObj && bodyObj.contentDocument && bodyObj.contentDocument.documentElement
+          && faceObj.contentDocument && faceObj.contentDocument.documentElement
+          && bodyObj.contentDocument.querySelectorAll('*').length > 5) {
+        callback();
+      } else {
+        setTimeout(function() { waitForSVGs(callback); }, 200);
+      }
+    }
+
+    waitForSVGs(function() {
+    var params = new URLSearchParams(window.location.search);
+    var pacienteId = params.get('pacienteId');
+    var cedula = params.get('cedula');
+
+    var btn = document.getElementById('btnGuardarEsquema');
+    if (!btn) return;
+
+    btn.style.display = 'inline-block';
+
+    function svgToImage(svgEl, width, height, svgString) {
+      return new Promise(function(resolve, reject) {
+        // Si no se pasó el string, leerlo del elemento (pero preferimos recibir el string)
+        if (!svgString) {
+          svgString = svgEl.outerHTML;
+        }
+        // Asegurar xmlns
+        if (svgString.indexOf('xmlns=') === -1) {
+          svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+        }
+        // Asegurar dimensiones
+        svgString = svgString.replace(/<svg([^>]*)>/, function(match, attrs) {
+          var newAttrs = attrs.replace(/width="[^"]*"/g, '').replace(/height="[^"]*"/g, '');
+          return '<svg' + newAttrs + ' width="' + width + '" height="' + height + '">';
+        });
+        var dataUri = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+        var img = new Image();
+        img.onload = function() {
+          resolve(img);
+        };
+        img.onerror = function(e) {
+          reject(new Error('No se pudo cargar el SVG como imagen'));
+        };
+        img.src = dataUri;
+      });
+    }
+
+    // Escuchar postMessage del padre para disparar guardado
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'SAVE_ESQUEMA') {
+        btn.click();
+      }
+    });
+
+    btn.addEventListener('click', function() {
+      btn.textContent = 'Guardando...';
+      btn.disabled = true;
+
+      // Overlay de "Guardando..." en toda la pantalla
+      var overlay = document.createElement('div');
+      overlay.id = 'savingOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99998;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+      overlay.innerHTML = '<div style="background:white;border-radius:16px;padding:32px 48px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3);">' +
+        '<div style="width:48px;height:48px;border:4px solid #e5e7eb;border-top-color:#1a6b32;border-radius:50%;margin:0 auto 16px;animation:spin 0.8s linear infinite;"></div>' +
+        '<p style="font-size:18px;font-weight:bold;color:#1a6b32;margin:0;">Guardando esquema...</p>' +
+        '<p style="font-size:13px;color:#6b7280;margin-top:8px;">Por favor espere</p></div>';
+      var styleEl = document.createElement('style');
+      styleEl.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+      overlay.appendChild(styleEl);
+      document.body.appendChild(overlay);
+
+      var objects = document.querySelectorAll('object[type="image/svg+xml"]');
+      var svgData = [];
+
+      objects.forEach(function(obj) {
+        try {
+          var svgDoc = obj.contentDocument;
+          if (!svgDoc || !svgDoc.documentElement || svgDoc.documentElement.tagName !== 'svg') return;
+          var w = parseInt(obj.getAttribute('width') || '800');
+          var h = parseInt(obj.getAttribute('height') || '1000');
+          var svgString = svgDoc.documentElement.outerHTML;
+          svgData.push({ svgString: svgString, width: w, height: h });
+        } catch (e) { console.warn('SVG read error:', e); }
+      });
+
+      if (svgData.length === 0) {
+        var ov0 = document.getElementById('savingOverlay');
+        if (ov0) document.body.removeChild(ov0);
+        btn.textContent = 'Guardar Esquema';
+        btn.disabled = false;
+        return;
+      }
+
+      var svgPromises = svgData.map(function(item) {
+        return svgToImage(null, item.width, item.height, item.svgString).then(function(img) {
+          return { img: img, width: item.width, height: item.height };
+        });
+      });
+
+      Promise.all(svgPromises).then(function(images) {
+        var totalWidth = 0;
+        var maxHeight = 0;
+        images.forEach(function(item) {
+          totalWidth += item.width;
+          if (item.height > maxHeight) maxHeight = item.height;
+        });
+
+        var scale = 2;
+        var canvas = document.createElement('canvas');
+        canvas.width = totalWidth * scale;
+        canvas.height = maxHeight * scale;
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        var x = 0;
+        images.forEach(function(item) {
+          ctx.drawImage(item.img, x * scale, 0, item.width * scale, item.height * scale);
+          x += item.width;
+        });
+
+        var dataUrl = canvas.toDataURL('image/png', 1.0);
+        var ced = cedula || pacienteId || 'sin_paciente';
+        var fileName = 'esquema_' + ced + '.png';
+
+        // Descargar
+        var link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = fileName;
+        link.click();
+
+        // Enviar al padre para subir a HC
+        if (window.parent !== window) {
+          window.parent.postMessage({
+            type: 'ESQUEMA_SVG_DATA',
+            dataUrl: dataUrl,
+            fileName: fileName,
+            pacienteId: pacienteId,
+            cedula: cedula
+          }, '*');
+        }
+
+        btn.textContent = 'Guardar Esquema';
+        btn.disabled = false;
+
+        // Quitar overlay de "Guardando..."
+        var ov = document.getElementById('savingOverlay');
+        if (ov) document.body.removeChild(ov);
+
+        // Mostrar mensaje emergente de éxito
+        var toast = document.createElement('div');
+        toast.textContent = 'Esquema guardado en la base de datos';
+        toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1a6b32;color:white;padding:16px 32px;border-radius:10px;font-size:15px;font-weight:bold;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,0.3);transition:opacity 0.5s;';
+        document.body.appendChild(toast);
+        setTimeout(function() { toast.style.opacity = '0'; }, 2500);
+        setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
+
+        // Recargar la página completa del iframe para estado fresco
+        setTimeout(function() {
+          location.reload();
+        }, 1500);
+
+      }).catch(function(err) {
+        console.warn('Error al capturar:', err);
+        var ov2 = document.getElementById('savingOverlay');
+        if (ov2) document.body.removeChild(ov2);
+        btn.textContent = 'Guardar Esquema';
+        btn.disabled = false;
+        // Recargar incluso si falla
+        setTimeout(function() {
+          location.reload();
+        }, 1500);
+      });
+    });
+    }); // cierra waitForSVGs callback
+  })();
+  </script>
+</body>
+</html>
