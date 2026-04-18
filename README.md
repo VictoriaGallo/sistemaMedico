@@ -9,8 +9,7 @@
 * Santiago Duque Valencia
 * Laura Victoria Gallo Payana
 * Juan De Dios Rodriguez Perez
-* Julian Esteban Salamanca Angelone
-* Jose Sterling Minotta Ruiz
+
 
 
 
